@@ -1,0 +1,11 @@
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: developer
+rules:
+- apiGroups: [""]
+  resources: ["pods","services","configmaps","persistentvolumeclaims"]
+  verbs: ["get","list","create","delete","patch","update"]
+- apiGroups: ["apps"]
+  resources: ["deployments","statefulsets","replicasets"]
+  verbs: ["get","list","create","update","delete","patch"]

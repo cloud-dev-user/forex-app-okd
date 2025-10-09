@@ -1,0 +1,10 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: exchange-route
+spec:
+  to:
+    kind: Service
+    name: exchange-rate-service
+  port:
+    targetPort: 5001

@@ -1,0 +1,9 @@
+apiVersion: v1
+kind: Pod
+metadata:
+  name: bad-probe-demo
+spec:
+  containers:
+  - name: demo
+    image: busybox
+    command: ['sh','-c','exit 1']

@@ -1,0 +1,19 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: exchange-rate-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: exchange-rate-service
+  template:
+    metadata:
+      labels:
+        app: exchange-rate-service
+    spec:
+      containers:
+      - name: exchange
+        image: local-registry.example.com/forex/exchange-rate-service:latest
+        ports:
+        - containerPort: 5001

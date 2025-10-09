@@ -1,0 +1,10 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: currency-route
+spec:
+  to:
+    kind: Service
+    name: currency-service
+  port:
+    targetPort: 5000
