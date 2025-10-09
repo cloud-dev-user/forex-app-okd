@@ -1,3 +1,3 @@
-# Forex App - Training Boilerplate (Option A)
+# Forex App - Training Boilerplate 
 Lightweight OKD/OpenShift-ready app with two Flask microservices.
 See documentation inside each folder.
