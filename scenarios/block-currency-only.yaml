@@ -1,0 +1,22 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: block-currency-only
+spec:
+  podSelector:
+    matchLabels:
+      app: exchange-rate-service
+  policyTypes:
+    - Ingress
+  ingress:
+    # Allow all pods EXCEPT currency-service
+    - from:
+        - podSelector:
+            matchExpressions:
+              - key: app
+                operator: NotIn
+                values:
+                  - currency-service
+      ports:
+        - protocol: TCP
+          port: 5001
