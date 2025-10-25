@@ -1,0 +1,17 @@
+# allow-exchange-to-currency.yaml
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: allow-exchange-to-currency
+  namespace: forex-app
+spec:
+  podSelector:
+    matchLabels:
+      app: currency-service
+  policyTypes:
+  - Ingress
+  ingress:
+  - from:
+    - podSelector:
+        matchLabels:
+          app: exchange-rate-service
