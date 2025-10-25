@@ -20,3 +20,39 @@ spec:
         env:
         - name: EXCHANGE_RATE_URL
           value: "http://exchange-rate-service:5001"
+          apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: currency-service
+  namespace: forex-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: currency-service
+  template:
+    metadata:
+      labels:
+        app: currency-service
+    spec:
+      containers:
+      - name: currency
+        image: docker.io/vishnu11/currency:3.0.0
+        ports:
+        - containerPort: 5000
+        env:
+        - name: EXCHANGE_RATE_URL
+          value: "http://exchange-rate-service:5001"
+       livenessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 5
+          periodSeconds: 10
+       readinessProbe:
+          httpGet:
+            path: /health
+            port: 5000
+          initialDelaySeconds: 3
+          periodSeconds: 5
+
