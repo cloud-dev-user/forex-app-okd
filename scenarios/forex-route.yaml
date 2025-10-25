@@ -1,0 +1,18 @@
+apiVersion: route.openshift.io/v1
+kind: Route
+metadata:
+  name: currency-route
+  namespace: forex-app
+  annotations:
+    haproxy.router.openshift.io/auth-type: basic
+    haproxy.router.openshift.io/auth-secret: forex-auth
+    haproxy.router.openshift.io/auth-realm: "Forex-App Protected Area"
+spec:
+  to:
+    kind: Service
+    name: currency-service
+  port:
+    targetPort: 5000
+  tls:
+    termination: edge
+
