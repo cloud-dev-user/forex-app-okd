@@ -14,6 +14,6 @@ spec:
     spec:
       containers:
       - name: exchange
-        image: local-registry.example.com/forex/exchange-rate-service:latest
+        image: docker.io/vishnu11/exchange-rate:2.0.0
         ports:
         - containerPort: 5001

@@ -14,7 +14,7 @@ spec:
     spec:
       containers:
       - name: currency
-        image: local-registry.example.com/forex/currency-service:latest
+        image: docker.io/vishnu11/currency:3.0.0
         ports:
         - containerPort: 5000
         env:
