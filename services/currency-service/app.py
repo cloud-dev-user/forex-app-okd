@@ -1,9 +1,12 @@
-from flask import Flask, jsonify, request
+from flask import Flask, jsonify, request, render_template
 import os, requests
 
 app = Flask(__name__)
 SUPPORTED = ["USD","EUR","INR","JPY","GBP"]
 EXCHANGE_RATE_URL = os.getenv("EXCHANGE_RATE_URL","http://exchange-rate-service:5001")
+
+@app.route("/")
+def home(): return render_template("index.html")
 
 @app.route("/health")
 def health(): return jsonify({"status":"ok"})
