@@ -43,13 +43,13 @@ spec:
         env:
         - name: EXCHANGE_RATE_URL
           value: "http://exchange-rate-service:5001"
-       livenessProbe:
+        livenessProbe:
           httpGet:
             path: /health
             port: 5000
           initialDelaySeconds: 5
           periodSeconds: 10
-       readinessProbe:
+        readinessProbe:
           httpGet:
             path: /health
             port: 5000
