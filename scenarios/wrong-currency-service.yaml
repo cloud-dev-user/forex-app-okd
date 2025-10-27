@@ -1,0 +1,22 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: currency-service
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: currency-service
+  template:
+    metadata:
+      labels:
+        app: currency-service
+    spec:
+      containers:
+      - name: currency
+        image: local-registry.example.com/forex/currency-service:latest
+        ports:
+        - containerPort: 5000
+        env:
+        - name: EXCHANGE_RATE_URL
+          value: "http://exchange-rate-service:5001"
