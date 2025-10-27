@@ -1,0 +1,122 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: forex-app
+---
+# --------------------- #
+#  MySQL Database
+# --------------------- #
+apiVersion: v1
+kind: Secret
+metadata:
+  name: mysql-secret
+  namespace: forex-app
+type: Opaque
+stringData:
+  MYSQL_ROOT_PASSWORD: root123
+  MYSQL_DATABASE: forexdb
+  MYSQL_USER: forexuser
+  MYSQL_PASSWORD: forexpass
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: mysql
+  namespace: forex-app
+spec:
+  ports:
+    - port: 3306
+      targetPort: 3306
+  selector:
+    app: mysql
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: mysql
+  namespace: forex-app
+spec:
+  serviceName: mysql
+  replicas: 1
+  selector:
+    matchLabels:
+      app: mysql
+  template:
+    metadata:
+      labels:
+        app: mysql
+    spec:
+      containers:
+        - name: mysql
+          image: mysql:8.0
+          ports:
+            - containerPort: 3306
+          envFrom:
+            - secretRef:
+                name: mysql-secret
+          volumeMounts:
+            - name: mysql-pv
+              mountPath: /var/lib/mysql
+  volumeClaimTemplates:
+    - metadata:
+        name: mysql-pv
+      spec:
+        accessModes: ["ReadWriteOnce"]
+        resources:
+          requests:
+            storage: 1Gi
+---
+# --------------------- #
+#  Currency App
+# --------------------- #
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: currency
+  namespace: forex-app
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: currency
+  template:
+    metadata:
+      labels:
+        app: currency
+    spec:
+      containers:
+        - name: currency
+          image: docker.io/vishnu11/currency:3.0.0
+          ports:
+            - containerPort: 5000
+          env:
+            - name: DB_HOST
+              value: mysql.forex-app.svc.cluster.local
+            - name: DB_USER
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_USER
+            - name: DB_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_PASSWORD
+            - name: DB_NAME
+              valueFrom:
+                secretKeyRef:
+                  name: mysql-secret
+                  key: MYSQL_DATABASE
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: currency
+  namespace: forex-app
+spec:
+  selector:
+    app: currency
+  ports:
+    - port: 5000
+      targetPort: 5000
+  type: ClusterIP
