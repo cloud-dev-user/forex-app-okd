@@ -72,7 +72,7 @@ spec:
     spec:
       containers:
       - name: currency-service
-        image: quay.io/openshiftlabs/hello-openshift:v1
+        image: quay.io/ravi_kulkarni25/currency:3.0.0
         ports:
         - containerPort: 8080
         env:
@@ -106,7 +106,7 @@ spec:
     spec:
       containers:
       - name: exchange-rate-service
-        image: quay.io/openshiftlabs/hello-openshift:v1
+        image: quay.io/ravi_kulkarni25/exchange-rate:2.0.0
         ports:
         - containerPort: 8080
         readinessProbe:
