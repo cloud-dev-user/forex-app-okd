@@ -259,7 +259,7 @@ oc expose deployment exchange-rate-service --name=exchange-rate-route -n forex-c
 
 ---
 
-### 🧭 **Instructor Commands**
+### 🧭 **Commands**
 
 ```bash
 oc apply -f forex-namespace.yaml
@@ -272,8 +272,4 @@ oc apply -f rbac/developer-block.yaml
 oc get pods -n forex-challenge
 ```
 
----
 
-
-
-Would you like me to now combine both (Instructor setup + Participant lab) into a **single GitHub README.md** with navigation links and a table of contents at the top (so your repo looks like a professional multi-section lab)?
