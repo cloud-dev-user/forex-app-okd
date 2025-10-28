@@ -74,7 +74,7 @@ spec:
       - name: currency-service
         image: quay.io/ravi_kulkarni25/currency:3.0.0
         ports:
-        - containerPort: 8080
+        - containerPort: 5000
         env:
         - name: DB_HOST
           value: "wrong-db-host"   # Intentional misconfiguration
@@ -108,11 +108,11 @@ spec:
       - name: exchange-rate-service
         image: quay.io/ravi_kulkarni25/exchange-rate:2.0.0
         ports:
-        - containerPort: 8080
+        - containerPort: 5001
         readinessProbe:
           httpGet:
             path: /wrongpath     # Intentional wrong probe
-            port: 8080
+            port: 5001
           initialDelaySeconds: 5
           periodSeconds: 10
 ```
