@@ -1,416 +1,315 @@
 ````markdown
-# 🧩 Integrated Troubleshooting Challenge – Hands-On Lab  
----
+# 🧩 Forex Challenge – End-to-End Troubleshooting Guide (OpenShift on AWS)
 
 ## 🎯 Objective
-
-This hands-on challenge simulates a **broken Forex Application** deployed on **OpenShift (AWS)**.  
-You will identify and fix configuration, networking, and access issues until all components are fully functional.
-
----
-
-## 🧠 Background
-
-The Forex App contains three major components:
-
-| Component | Port | Description |
-|------------|------|-------------|
-| `forex-db` | 3306 | MySQL database backend |
-| `currency-service` | 5000 | REST API for currency data |
-| `exchange-rate-service` | 5001 | REST API for exchange rate conversion |
-
-Your instructor has deployed a deliberately **broken version** to test your troubleshooting skills.  
+This guide captures the real troubleshooting journey of deploying and fixing a broken three-tier app (`forex-challenge`) on OpenShift.  
+It walks through failures step-by-step, explaining what went wrong, how to debug, and how to fix.
 
 ---
 
-## 🧾 Lab Environment
+## 🧱 Environment Setup Overview
 
-| Parameter | Value |
-|------------|--------|
-| Namespace | `forex-challenge` |
-| Cluster | OpenShift on AWS |
-| Storage Class | `gp3-csi` (default) |
+| Component | Description |
+|------------|--------------|
+| **Namespace** | `forex-challenge` | ## Please change namespace wiht your unique namespace name
+| **Database** | MySQL 8.0 (`forex-db`) |
+| **Microservices** | `currency-service` (port 5000), `exchange-rate-service` (port 5001) |
+| **StorageClass** | `gp3-csi` |
+| **Cluster** | OpenShift on AWS |
+| **Intentional Breaks** | NetworkPolicy, ResourceQuota, RBAC, Readiness probe, Missing Service/Route |
 
 ---
 
-# 🧩 Step 1 – Environment Assessment
+## 🪜 Step-by-Step Troubleshooting Flow
 
-### 🧭 Inspect Namespace Resources
+### 🔹 Step 1 – Deploy Broken Environment
 ```bash
-oc project forex-challenge
-oc get all -n forex-challenge
-oc get events -n forex-challenge --sort-by=.lastTimestamp
+oc apply -f forex-namespace.yaml
+oc apply -f deployments/forex-db.yaml
+oc apply -f deployments/currency-service.yaml
+oc apply -f deployments/exchange-rate-service.yaml
+oc apply -f network/restrictive-networkpolicy.yaml
+oc apply -f quotas/resourcequota.yaml
+oc apply -f rbac/developer-block.yaml
 ````
 
-Look for:
-
-* Pods in `CrashLoopBackOff` or `NotReady` state
-* Failed probes
-* Quota errors or blocked deployments
-
----
-
-## 🔍 Inspect Pod Details
+**Observation:**
 
 ```bash
 oc get pods -n forex-challenge
-oc describe pod <pod-name> -n forex-challenge
 ```
 
-Typical state:
-
-```
-currency-service-xxxx     CrashLoopBackOff
-exchange-rate-service-xxx  Running (0/1 Ready)
-forex-db-xxxxxx            Running
-```
+All pods stuck at `0/1` or `Pending`.
 
 ---
 
-# 💥 Step 2 – Fix `currency-service` CrashLoopBackOff
-
-### 🔹 Problem
-
-* The service fails to connect to the database.
-* Root cause: Incorrect environment variable `DB_HOST`.
-
-### 🔎 Investigation
+### 🔹 Step 2 – Identify Initial Failures
 
 ```bash
-oc logs deployment/currency-service -n forex-challenge
+oc get events --sort-by='.lastTimestamp' | tail -n 20
 ```
 
-You’ll likely see:
+**Findings:**
+
+* Pods failing due to **quota enforcement**
+* PVC waiting for binding
+* Developer permissions restricted
+* Network policy blocking communication
+
+---
+
+### ⚠️ Issue 1 – Resource Quota Blocking Pods
+
+**Error:**
 
 ```
-Error: unable to connect to host wrong-db-host:3306
+failed quota: forex-quota: must specify limits.cpu, limits.memory, requests.cpu, requests.memory
 ```
 
-### 🧩 Fix
+**Fix:**
 
 ```bash
-oc set env deployment/currency-service DB_HOST=forex-db -n forex-challenge
+oc patch resourcequota forex-quota -n forex-challenge --type merge \
+  -p '{"spec":{"hard":{"pods":"10","requests.cpu":"1","requests.memory":"2Gi","limits.cpu":"2","limits.memory":"4Gi"}}}'
+```
+
+**Then add resource limits to all deployments:**
+
+```bash
+oc set resources deployment/forex-db \
+  --requests=cpu=200m,memory=256Mi --limits=cpu=500m,memory=512Mi -n forex-challenge
+oc set resources deployment/currency-service \
+  --requests=cpu=200m,memory=256Mi --limits=cpu=500m,memory=512Mi -n forex-challenge
+oc set resources deployment/exchange-rate-service \
+  --requests=cpu=200m,memory=256Mi --limits=cpu=500m,memory=512Mi -n forex-challenge
+```
+
+Restart deployments:
+
+```bash
+oc rollout restart deployment/forex-db -n forex-challenge
 oc rollout restart deployment/currency-service -n forex-challenge
+oc rollout restart deployment/exchange-rate-service -n forex-challenge
 ```
 
-### ✅ Verify
+✅ Verify:
 
 ```bash
 oc get pods -n forex-challenge
-oc logs deployment/currency-service -n forex-challenge
 ```
-
-✅ **Expected Result:** Pod transitions to `Running` with no crash loops.
 
 ---
 
-# 💥 Step 3 – Fix Readiness Probe Failure (`exchange-rate-service`)
+### ⚠️ Issue 2 – NetworkPolicy Blocking Service Access
 
-### 🔹 Problem
+**Cause:** Restrictive `block-currency-service` network policy prevented ingress to the service.
 
-* Pod never becomes ready.
-* Readiness probe uses incorrect path or port.
-
-### 🔎 Investigation
+**Fix:**
 
 ```bash
-oc describe pod <exchange-rate-pod> -n forex-challenge
+oc delete networkpolicy block-currency-service -n forex-challenge
 ```
 
-Expected error:
+---
+
+### ⚠️ Issue 3 – Developer RBAC Restrictions
+
+**Cause:** Developer role had only “view” access.
+
+**Fix:**
+
+```bash
+oc delete rolebinding block-developer -n forex-challenge
+oc adm policy add-role-to-user edit developer -n forex-challenge
+```
+
+✅ Verify:
+
+```bash
+oc auth can-i create pods --as developer -n forex-challenge
+```
+
+Should return **yes**.
+
+---
+
+### ⚠️ Issue 4 – Quota Exhaustion (CPU Limit Reached)
+
+**Event:**
+
+```
+Error creating: exceeded quota: forex-quota, requested: limits.cpu=500m, used: limits.cpu=2, limited: limits.cpu=2
+```
+
+**Fix:**
+Increase CPU and memory quota again:
+
+```bash
+oc patch resourcequota forex-quota -n forex-challenge --type merge \
+  -p '{"spec":{"hard":{"pods":"10","requests.cpu":"2","requests.memory":"4Gi","limits.cpu":"4","limits.memory":"8Gi"}}}'
+```
+
+---
+
+### ⚠️ Issue 5 – Readiness Probe Failure (404)
+
+**Event:**
 
 ```
 Readiness probe failed: HTTP probe failed with statuscode: 404
 ```
 
-### 🧩 Fix Probe Configuration
+**Cause:** Wrong probe path `/wrongpath`.
+
+**Fix:**
 
 ```bash
 oc set probe deployment/exchange-rate-service \
-  --readiness --get-url=http://:5001/ -n forex-challenge
+  --readiness --get-url=http://:5001/health -n forex-challenge
 oc rollout restart deployment/exchange-rate-service -n forex-challenge
 ```
 
-### ✅ Verify
+✅ Verify:
 
 ```bash
-oc get pods -n forex-challenge
-oc describe pod <exchange-rate-pod> -n forex-challenge
+oc describe pod -l app=exchange-rate-service -n forex-challenge | grep Readiness
 ```
-
-✅ **Expected Result:** Probe succeeds and pod is marked `Ready 1/1`.
 
 ---
 
-# 💥 Step 4 – NetworkPolicy Blocks Access
+### ⚠️ Issue 6 – Missing Services and Routes
 
-### 🔹 Problem
+**Symptom:**
 
-* `exchange-rate-service` cannot call `currency-service` on port 5000.
-* A restrictive NetworkPolicy blocks ingress.
+```
+$ oc get svc
+No resources found in forex-challenge namespace.
+```
 
-### 🔎 Investigation
+**Fix:**
+Recreate missing Services:
 
 ```bash
-oc get networkpolicy -n forex-challenge
-oc describe networkpolicy block-currency-service -n forex-challenge
-```
-
-You’ll see:
-
-```yaml
-ingress: []
-```
-
-### 🧩 Fix
-
-Create an allow policy.
-
-**File: allow-exchange-to-currency.yaml**
-
-```yaml
-apiVersion: networking.k8s.io/v1
-kind: NetworkPolicy
+cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Service
 metadata:
-  name: allow-exchange-to-currency
+  name: forex-db
   namespace: forex-challenge
 spec:
-  podSelector:
-    matchLabels:
-      app: currency-service
-  policyTypes:
-  - Ingress
-  ingress:
-  - from:
-    - podSelector:
-        matchLabels:
-          app: exchange-rate-service
-    ports:
-    - protocol: TCP
-      port: 5000
+  selector:
+    app: forex-db
+  ports:
+  - port: 3306
+    targetPort: 3306
+EOF
+
+cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  name: currency-service
+  namespace: forex-challenge
+spec:
+  selector:
+    app: currency-service
+  ports:
+  - port: 5000
+    targetPort: 5000
+EOF
+
+cat <<EOF | oc apply -f -
+apiVersion: v1
+kind: Service
+metadata:
+  name: exchange-rate-service
+  namespace: forex-challenge
+spec:
+  selector:
+    app: exchange-rate-service
+  ports:
+  - port: 5001
+    targetPort: 5001
+EOF
 ```
 
-Apply:
+Expose routes:
 
 ```bash
-oc apply -f allow-exchange-to-currency.yaml
+oc expose svc currency-service -n forex-challenge
+oc expose svc exchange-rate-service -n forex-challenge
 ```
 
-### ✅ Verify
+✅ Verify:
 
 ```bash
-oc exec -it $(oc get pod -l app=exchange-rate-service -n forex-challenge -o name) -n forex-challenge -- curl currency-service:5000
+oc get svc -n forex-challenge
+oc get routes -n forex-challenge
 ```
-
-✅ **Expected Result:** Response returned successfully (HTTP 200).
 
 ---
 
-# 💥 Step 5 – Missing External Route for `exchange-rate-service`
+### ✅ Step 7 – Validate Application End-to-End
 
-### 🔹 Problem
-
-* No route exists to access the service externally.
-
-### 🔎 Investigation
+**Check Pods:**
 
 ```bash
-oc get route -n forex-challenge
-```
-
-Output: none.
-
-### 🧩 Fix
-
-Expose a route on port **5001**:
-
-```bash
-oc expose deployment exchange-rate-service \
-  --name=exchange-rate-route \
-  --port=5001 -n forex-challenge
-```
-
-### ✅ Verify
-
-```bash
-oc get route -n forex-challenge
-```
-
-✅ **Expected Result:** Route available with external hostname (e.g., `exchange-rate-route-forex-challenge.apps.cluster...`).
-
----
-
-# 💥 Step 6 – ResourceQuota Too Restrictive
-
-### 🔹 Problem
-
-* Pods throttled or pending due to CPU/memory limits.
-
-### 🔎 Investigation
-
-```bash
-oc describe quota -n forex-challenge
-```
-
-Typical output:
-
-```
-pods: 1 used of 1
-requests.cpu: 150m hard limit
-```
-
-### 🧩 Fix Resource Limits
-
-```bash
-oc set resources deployment/currency-service \
-  --requests=cpu=200m,memory=256Mi \
-  --limits=cpu=500m,memory=512Mi -n forex-challenge
-```
-
-Patch quota if required:
-
-```bash
-oc patch resourcequota forex-quota -n forex-challenge --type merge -p \
-'{"spec":{"hard":{"pods":"5","requests.cpu":"1","limits.cpu":"2"}}}'
-```
-
-### ✅ Verify
-
-```bash
-oc describe quota -n forex-challenge
 oc get pods -n forex-challenge
 ```
 
-✅ **Expected Result:** All pods scheduled and stable.
+**Check PVC Binding:**
+
+```bash
+oc get pvc -n forex-challenge
+```
+
+**Access Application:**
+
+```bash
+curl -i http://currency-service-forex-challenge.apps.okd-demo.cloudtraining.publicvm.com/
+curl -i http://exchange-rate-service-forex-challenge.apps.okd-demo.cloudtraining.publicvm.com/
+```
+
+✅ Expected:
+
+```
+HTTP/1.1 200 OK
+Currency Service is running
+Exchange Rate Service is running
+```
 
 ---
 
-# 💥 Step 7 – RBAC Restriction
+## 🧾 Final Verification Summary
 
-### 🔹 Problem
-
-* Developer cannot create or edit deployments.
-
-### 🔎 Investigation
-
-```bash
-oc auth can-i create deployment -n forex-challenge --as developer
-```
-
-Output: `no`
-
-### 🧩 Fix
-
-```bash
-oc adm policy add-role-to-user edit developer -n forex-challenge
-```
-
-### ✅ Verify
-
-```bash
-oc auth can-i create deployment -n forex-challenge --as developer
-```
-
-✅ **Expected Result:** `yes`
+| Check   | Command                          | Expected                   |
+| ------- | -------------------------------- | -------------------------- |
+| Pods    | `oc get pods -n forex-challenge` | All in `Running` state     |
+| Quota   | `oc describe quota forex-quota`  | Enough CPU/memory headroom |
+| PVC     | `oc get pvc`                     | `Bound`                    |
+| Network | `oc get networkpolicy`           | No blocking rules          |
+| Routes  | `oc get routes`                  | Public URLs visible        |
+| Health  | `curl -i <route-url>`            | `HTTP/1.1 200 OK`          |
 
 ---
 
-# 💥 Step 8 – PVC Mount Path Incorrect (`forex-db`)
+## 🧠 Lessons Learned
 
-### 🔹 Problem
-
-* MySQL database mounted at wrong path `/wrongpath`.
-
-### 🔎 Investigation
-
-```bash
-oc describe pod <forex-db-pod> -n forex-challenge | grep Mount
-```
-
-### 🧩 Fix
-
-Edit deployment:
-
-```bash
-oc edit deployment forex-db -n forex-challenge
-```
-
-Change:
-
-```yaml
-mountPath: /var/lib/mysql
-```
-
-Apply and restart:
-
-```bash
-oc rollout restart deployment/forex-db -n forex-challenge
-```
-
-### ✅ Verify
-
-```bash
-oc exec -it $(oc get pod -l app=forex-db -n forex-challenge -o name) -n forex-challenge -- ls /var/lib/mysql
-```
-
-✅ **Expected Result:** MySQL data directory visible.
+| Category            | Key Learning                                                   |
+| ------------------- | -------------------------------------------------------------- |
+| Resource Management | Always define CPU/memory requests and limits when quotas exist |
+| RBAC                | Ensure appropriate roles (e.g. `edit`) before troubleshooting  |
+| Network Policies    | Test ingress/egress impact using temporary deletions           |
+| Probes              | Match probe endpoints with actual application routes           |
+| Service Exposure    | `oc expose svc` is essential for external testing              |
+| Quotas              | Monitor and tune namespace limits regularly                    |
 
 ---
 
-# 💥 Step 9 – Governance & Security Enforcement
-
-Apply OpenShift Pod Security Standards.
+## 🧹 Cleanup
 
 ```bash
-oc label namespace forex-challenge pod-security.kubernetes.io/enforce=restricted
+oc delete project forex-challenge
+oc new-project forex-challenge
 ```
 
-✅ **Expected Result:** Namespace labeled successfully.
-
----
-
-# 🧭 Step 10 – Final Validation
-
-Run final checks:
-
-```bash
-oc get pods,svc,route,networkpolicy,quota -n forex-challenge
-```
-
-✅ **Expected Results**
-
-| Component             | Port                  | Status  |
-| --------------------- | --------------------- | ------- |
-| currency-service      | 5000                  | Running |
-| exchange-rate-service | 5001                  | Running |
-| forex-db              | 3306                  | Running |
-| Route                 | Accessible externally |         |
-| PVC                   | Bound                 |         |
-| RBAC                  | Corrected             |         |
-| Quota                 | Adjusted              |         |
-| NetworkPolicy         | Fixed                 |         |
-
----
-
-# 🏁 Challenge Summary
-
-| Issue                               | Root Cause            | Resolution                 |
-| ----------------------------------- | --------------------- | -------------------------- |
-| `currency-service` CrashLoopBackOff | Wrong DB_HOST         | Set to `forex-db`          |
-| `exchange-rate-service` not ready   | Wrong probe path/port | Fixed probe to `:5001/`    |
-| NetworkPolicy                       | All ingress blocked   | Created allow policy       |
-| Missing route                       | None created          | Exposed route on port 5001 |
-| ResourceQuota                       | Too low               | Increased CPU/memory       |
-| RBAC                                | View-only             | Granted `edit` role        |
-| PVC mount                           | Wrong directory       | Fixed to `/var/lib/mysql`  |
-
-✅ **Final Outcome:** Forex Application fully functional and reachable.
-
----
-
-# 📸 Screenshots to Capture
-
-1. `oc get pods -n forex-challenge`
-2. `oc get route -n forex-challenge`
-3. `curl` from exchange-rate → currency-service (5000)
-4. Route access output in browser
