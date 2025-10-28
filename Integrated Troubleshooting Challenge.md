@@ -16,15 +16,13 @@ Below are both documents rewritten in **GitHub-friendly Markdown (MD)** format s
 
 ### **Environment Setup: Integrated Troubleshooting Challenge**
 
-*(Instructor Guide – SSK Training & Consulting)*
-
 ---
 
 ### 🧠 Overview
 
 A pre-broken **Forex App** setup used for Module 11 – *Integrated Troubleshooting Challenge*.
 
-This setup intentionally introduces multiple issues for participants to diagnose and fix.
+This setup intentionally introduces multiple issues to diagnose and fix.
 
 ---
 
@@ -98,7 +96,7 @@ spec:
     spec:
       containers:
       - name: currency-service
-        image: quay.io/openshiftlabs/hello-openshift:v1
+        image: quay.io/ravi_kulkarni25/currency:3.0.0
         ports:
         - containerPort: 8080
         env:
@@ -130,7 +128,7 @@ spec:
     spec:
       containers:
       - name: exchange-rate-service
-        image: quay.io/openshiftlabs/hello-openshift:v1
+        image: quay.io/ravi_kulkarni25/exchange-rate:2.0.0
         ports:
         - containerPort: 8080
         readinessProbe:
