@@ -1,0 +1,2 @@
+currency=4.5.0
+exchange-rate= 5.0.9
