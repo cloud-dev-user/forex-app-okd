@@ -32,7 +32,7 @@ forex-challenge/
 ---
 
 ### 🧩 **File: forex-namespace.yaml**     
-*(Make sure to use unique namespace for your forex chanllenge environment)*
+*(Make sure to use change namespace name below and in other file references for your forex chanllenge environment)*
 ```yaml
 apiVersion: v1
 kind: Namespace
