@@ -13,7 +13,6 @@ In this lab, you will:
 
 **Namespace:** `forex-app-user5`  
 **Storage Class:** `gp3-csi`  
-**Duration:** ~60 minutes  
 
 ---
 
@@ -61,7 +60,7 @@ oc apply -f manifests/2_mysql-pvc.yaml
 oc get pvc -n forex-app-user5
 ```
 
-✅ **Expected Result:** PVC status shows `Bound`
+✅ **Expected Result:** PVC status shows `pending`. It will go to `bound ` state once pod is created
 
 ---
 
