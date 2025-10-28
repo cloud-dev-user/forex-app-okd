@@ -173,9 +173,10 @@ exit
 
 ## 🧩 Part 4 – Backup
 
-### 1️⃣ SQL Dump
+### 1️⃣ Create backup folder and SQL Dump
 
 ```bash
+mkdir backup
 oc exec -i $(oc get pod -l app=mysql-db -o name -n forex-app-user5) -n forex-app-user5 -- \
   mysqldump -uroot -predhat forexdb > backup/forex-db-dump.sql
 ```
